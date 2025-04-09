@@ -215,7 +215,7 @@ class CommandHandler {
 
             const recipientNumberId = await this.client.getNumberId(
               data.recipient
-            ).catch(() =>{});
+            ).catch(() => { });
 
             if (recipientNumberId?._serialized && data?.message)
               await this.client.sendMessage(
@@ -223,26 +223,123 @@ class CommandHandler {
                 data.message
               );
           }
-          
+
           await LeadModel.updateOne({
-                tel: contact.number
-            }, {
-                name: contact.name || contact.pushname,
-                lastcommand: body
-            }, {
-                upsert: true
-            });
+            tel: contact.number
+          }, {
+            name: contact.name || contact.pushname,
+            lastcommand: body
+          }, {
+            upsert: true
+          });
           return;
         }
       }
 
+      console.log(message.from);
+
       await this.client.sendMessage(
         message.from,
-        "Неккоректный формат обращения." +
-          (this.startDialog &&
-            " Для начала диалога наберите команду " + this.startDialog)
+        "В данный момент ведётся процесс разработки. Это сообщение сформировано автоматически." +
+        (this.startDialog &&
+          " Для начала диалога наберите команду " + this.startDialog)
       );
-    } catch (error) {}
+    } catch (error) { }
+  }
+
+  /**
+   * 
+   */
+  async debug() {
+    try {
+
+      const chatId = "77789947805@c.us";
+      const content = "Тестовое сообщение от бота";
+      const options ={};
+
+      if (options.mentions) {
+        !Array.isArray(options.mentions) && (options.mentions = [options.mentions]);
+        if (options.mentions.some((possiblyContact) => possiblyContact instanceof whatsapp.Contact)) {
+          console.warn('Mentions with an array of Contact are now deprecated. See more at https://github.com/pedroslopez/whatsapp-web.js/pull/2166.');
+          options.mentions = options.mentions.map((a) => a.id._serialized);
+        }
+      }
+
+      options.groupMentions && !Array.isArray(options.groupMentions) && (options.groupMentions = [options.groupMentions]);
+
+      let internalOptions = {
+        linkPreview: options.linkPreview === false ? undefined : true,
+        sendAudioAsVoice: options.sendAudioAsVoice,
+        sendVideoAsGif: options.sendVideoAsGif,
+        sendMediaAsSticker: options.sendMediaAsSticker,
+        sendMediaAsDocument: options.sendMediaAsDocument,
+        caption: options.caption,
+        quotedMessageId: options.quotedMessageId,
+        parseVCards: options.parseVCards !== false,
+        mentionedJidList: options.mentions || [],
+        groupMentions: options.groupMentions,
+        invokedBotWid: options.invokedBotWid,
+        extraOptions: options.extra
+      };
+
+      const sendSeen = typeof options.sendSeen === 'undefined' ? true : options.sendSeen;
+
+      if (content instanceof whatsapp.MessageMedia) {
+        internalOptions.attachment = content;
+        internalOptions.isViewOnce = options.isViewOnce,
+          content = '';
+      } else if (options.media instanceof whatsapp.MessageMedia) {
+        internalOptions.attachment = options.media;
+        internalOptions.caption = content;
+        internalOptions.isViewOnce = options.isViewOnce,
+          content = '';
+      } else if (content instanceof whatsapp.Location) {
+        internalOptions.location = content;
+        content = '';
+      } else if (content instanceof whatsapp.Poll) {
+        internalOptions.poll = content;
+        content = '';
+      } else if (content instanceof whatsapp.Contact) {
+        internalOptions.contactCard = content.id._serialized;
+        content = '';
+      } else if (Array.isArray(content) && content.length > 0 && content[0] instanceof Contact) {
+        internalOptions.contactCardList = content.map(contact => contact.id._serialized);
+        content = '';
+      } else if (content instanceof whatsapp.Buttons) {
+        if (content.type !== 'chat') { internalOptions.attachment = content.body; }
+        internalOptions.buttons = content;
+        content = '';
+      } else if (content instanceof whatsapp.List) {
+        internalOptions.list = content;
+        content = '';
+      }
+
+      // if (internalOptions.sendMediaAsSticker && internalOptions.attachment) {
+      //   internalOptions.attachment = await Util.formatToWebpSticker(
+      //     internalOptions.attachment, {
+      //     name: options.stickerName,
+      //     author: options.stickerAuthor,
+      //     categories: options.stickerCategories
+      //   }, this.pupPage
+      //   );
+      // }
+
+      const newMessage = await this.client.pupPage.evaluate(async (chatId, message, options, sendSeen) => {
+        const chatWid = window.Store.WidFactory.createWid(chatId);
+        const chat = await window.Store.Chat.find(chatWid);
+
+
+        if (sendSeen) {
+          await window.WWebJS.sendSeen(chatId);
+        }
+
+        const msg = await window.WWebJS.sendMessage(chat, message, options, sendSeen);
+        return window.WWebJS.getMessageModel(msg);
+      }, chatId, content, internalOptions, sendSeen);
+
+      return newMessage;
+      // return new Message(this.client, newMessage);
+    } catch (error) { }
   }
 }
 
