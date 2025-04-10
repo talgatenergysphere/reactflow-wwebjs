@@ -21,9 +21,7 @@
   "overrides": {
     "tar-fs": "^3.0.4",
     "ws": "^8.17.1",
-    "whatwg-url": {
-      "punycode": "^2.3.0"
-    }
+    "whatwg-url": "^14.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

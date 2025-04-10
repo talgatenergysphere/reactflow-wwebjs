@@ -21,6 +21,7 @@ export default async function whatsappConnect() {
   });
 
   client.on('message', message => CommandHandler.message(message));
+  client.on('message_create', message => CommandHandler.message(message));
 
   return client.initialize();
 }
